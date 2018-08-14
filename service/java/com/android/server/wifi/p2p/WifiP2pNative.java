@@ -41,7 +41,6 @@ public class WifiP2pNative {
     private final HalDeviceManager mHalDeviceManager;
     private IWifiP2pIface mIWifiP2pIface;
     private InterfaceAvailableListenerInternal mInterfaceAvailableListener;
-    private InterfaceDestroyedListenerInternal mInterfaceDestroyedListener;
 
     // Internal callback registered to HalDeviceManager.
     private class InterfaceAvailableListenerInternal implements
@@ -55,7 +54,6 @@ public class WifiP2pNative {
 
         @Override
         public void onAvailabilityChanged(boolean isAvailable) {
-            Log.d(TAG, "P2P InterfaceAvailableListener " + isAvailable);
             // We need another level of abstraction here. When a P2P interface is created,
             // we should mask the availability change callback from WifiP2pService.
             // This is because when the P2P interface is created, we'll get a callback
@@ -67,36 +65,6 @@ public class WifiP2pNative {
                 return;
             }
             mExternalListener.onAvailabilityChanged(isAvailable);
-        }
-    }
-
-    // Internal callback registered to HalDeviceManager.
-    private class InterfaceDestroyedListenerInternal implements
-            HalDeviceManager.InterfaceDestroyedListener {
-        private final HalDeviceManager.InterfaceDestroyedListener mExternalListener;
-        private boolean mValid;
-
-        InterfaceDestroyedListenerInternal(
-                HalDeviceManager.InterfaceDestroyedListener externalListener) {
-            mExternalListener = externalListener;
-            mValid = true;
-        }
-
-        public void teardownAndInvalidate(@NonNull String ifaceName) {
-            mSupplicantP2pIfaceHal.teardownIface(ifaceName);
-            mIWifiP2pIface = null;
-            mValid = false;
-        }
-
-        @Override
-        public void onDestroyed(String ifaceName) {
-            Log.d(TAG, "P2P InterfaceDestroyedListener " + ifaceName);
-            if (!mValid) {
-                Log.d(TAG, "Ignoring stale interface destroyed listener");
-                return;
-            }
-            teardownAndInvalidate(ifaceName);
-            mExternalListener.onDestroyed(ifaceName);
         }
     }
 
@@ -178,10 +146,15 @@ public class WifiP2pNative {
     public String setupInterface(
             @NonNull HalDeviceManager.InterfaceDestroyedListener destroyedListener,
             Handler handler) {
-        Log.d(TAG, "Setup P2P interface");
         if (mIWifiP2pIface == null) {
-            mInterfaceDestroyedListener = new InterfaceDestroyedListenerInternal(destroyedListener);
-            mIWifiP2pIface = mHalDeviceManager.createP2pIface(mInterfaceDestroyedListener, handler);
+            HalDeviceManager.InterfaceDestroyedListener internalDestroyedListener =
+                    (@NonNull String ifaceName) -> {
+                        Log.i(TAG, "IWifiP2pIface destroyedListener");
+                        mSupplicantP2pIfaceHal.teardownIface(ifaceName);
+                        mIWifiP2pIface = null;
+                        destroyedListener.onDestroyed(ifaceName);
+                    };
+            mIWifiP2pIface = mHalDeviceManager.createP2pIface(internalDestroyedListener, handler);
             if (mIWifiP2pIface == null) {
                 Log.e(TAG, "Failed to create P2p iface in HalDeviceManager");
                 return null;
@@ -202,7 +175,6 @@ public class WifiP2pNative {
                 teardownInterface();
                 return null;
             }
-            Log.i(TAG, "P2P interface setup completed");
         }
         return HalDeviceManager.getName(mIWifiP2pIface);
     }
@@ -211,12 +183,9 @@ public class WifiP2pNative {
      * Teardown P2p interface.
      */
     public void teardownInterface() {
-        Log.d(TAG, "Teardown P2P interface");
         if (mIWifiP2pIface != null) {
-            String ifaceName = HalDeviceManager.getName(mIWifiP2pIface);
             mHalDeviceManager.removeIface(mIWifiP2pIface);
-            mInterfaceDestroyedListener.teardownAndInvalidate(ifaceName);
-            Log.i(TAG, "P2P interface teardown completed");
+            mIWifiP2pIface = null;
         }
     }
 
