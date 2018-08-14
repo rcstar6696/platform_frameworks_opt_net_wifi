@@ -23,7 +23,6 @@ import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pGroupList;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.os.Handler;
-import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.server.wifi.HalDeviceManager;
@@ -110,13 +109,7 @@ public class WifiP2pNative {
                 teardownInterface();
                 return null;
             }
-            String ifaceName = HalDeviceManager.getName(mIWifiP2pIface);
-            if (TextUtils.isEmpty(ifaceName)) {
-                Log.e(TAG, "Failed to get p2p iface name");
-                teardownInterface();
-                return null;
-            }
-            if (!mSupplicantP2pIfaceHal.setupIface(ifaceName)) {
+            if (!mSupplicantP2pIfaceHal.setupIface(HalDeviceManager.getName(mIWifiP2pIface))) {
                 Log.e(TAG, "Failed to setup P2p iface in supplicant");
                 teardownInterface();
                 return null;
