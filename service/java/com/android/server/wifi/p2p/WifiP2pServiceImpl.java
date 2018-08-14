@@ -731,7 +731,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                 WifiManager.WIFI_STATE_UNKNOWN);
                         if (wifistate == WifiManager.WIFI_STATE_ENABLED) {
                             mIsWifiEnabled = true;
-                            checkAndReEnableP2p();
                         } else {
                             mIsWifiEnabled = false;
                             // Teardown P2P if it's up already.
@@ -743,9 +742,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 // Register for interface availability from HalDeviceManager
                 mWifiNative.registerInterfaceAvailableListener((boolean isAvailable) -> {
                     mIsInterfaceAvailable = isAvailable;
-                    if (isAvailable) {
-                        checkAndReEnableP2p();
-                    }
                     checkAndSendP2pStateChangedBroadcast();
                 }, getHandler());
             }
@@ -2487,22 +2483,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             pw.println();
         }
 
-        // Check & re-enable P2P if needed.
-        // P2P interface will be created if all of the below are true:
-        // a) Wifi is enabled.
-        // b) P2P interface is available.
-        // c) There is atleast 1 client app which invoked initialize().
-        private void checkAndReEnableP2p() {
-            Log.d(TAG, "Wifi enabled=" + mIsWifiEnabled + ", P2P Interface availability="
-                    + mIsInterfaceAvailable + ", Number of clients=" + mDeathDataByBinder.size());
-            if (mIsWifiEnabled && mIsInterfaceAvailable && !mDeathDataByBinder.isEmpty()) {
-                sendMessage(ENABLE_P2P);
-            }
-        }
-
         private void checkAndSendP2pStateChangedBroadcast() {
-            Log.d(TAG, "Wifi enabled=" + mIsWifiEnabled + ", P2P Interface availability="
-                    + mIsInterfaceAvailable);
+            Log.d(TAG, "Wifi enabled = " + mIsWifiEnabled);
+            Log.d(TAG, "P2P Interface availability = " + mIsInterfaceAvailable);
             sendP2pStateChangedBroadcast(mIsWifiEnabled && mIsInterfaceAvailable);
         }
 
